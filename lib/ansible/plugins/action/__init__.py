@@ -747,6 +747,7 @@ class ActionBase(ABC, _AnsiblePluginInfoMixin):
             remote_paths,
             become_user,
             setfacl_mode)
+        setfacl_res = res
 
         match res.get('rc'):
             case 0:
@@ -880,8 +881,8 @@ class ActionBase(ABC, _AnsiblePluginInfoMixin):
             'to create when becoming an unprivileged user '
             '(rc: %s, err: %s}). For information on working around this, see %s'
             '#risks-of-becoming-an-unprivileged-user' % (
-                res['rc'],
-                to_native(res['stderr']), become_link))
+                setfacl_res['rc'],
+                to_native(setfacl_res['stderr']), become_link))
 
     def _remote_chmod(self, paths, mode, sudoable=False):
         """

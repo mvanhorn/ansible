@@ -437,9 +437,9 @@ class TestActionBase(unittest.TestCase):
         # Step 3b: chmod +rwx if we need to
         # To get here, setfacl failed, so mock it as such.
         action_base._remote_set_user_facl.return_value = {
-            'rc': 1,
+            'rc': 127,
             'stdout': '',
-            'stderr': '',
+            'stderr': '/bin/sh: setfacl: not found',
         }
         action_base._remote_chmod.return_value = {
             'rc': 1,
@@ -556,7 +556,25 @@ class TestActionBase(unittest.TestCase):
         action_base.get_shell_option.side_effect = get_shell_option_for_arg(
             {},
             None)
-        assertThrowRegex('on the temporary files Ansible needs to create')
+        action_base._remote_chmod.return_value = {
+            'rc': 1,
+            'stdout': '',
+            'stderr': 'chmod: invalid mode: A+user:remoteuser2:r:allow',
+        }
+        with self.assertRaises(AnsibleError) as context:
+            runWithNoExpectation()
+        self.assertIn('(rc: 127, err: /bin/sh: setfacl: not found', str(context.exception))
+        self.assertNotIn('chmod: invalid mode', str(context.exception))
+
+        action_base._remote_set_user_facl.return_value = {
+            'rc': 13,
+            'stdout': '',
+            'stderr': 'setfacl: permission denied',
+        }
+        with self.assertRaises(AnsibleError) as context:
+            runWithNoExpectation()
+        self.assertIn('(rc: 13, err: setfacl: permission denied', str(context.exception))
+        self.assertNotIn('chmod: invalid mode', str(context.exception))
 
     def test_action_base__remove_tmp_path(self):
         # create our fake task

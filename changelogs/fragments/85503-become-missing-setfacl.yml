@@ -1,0 +1,2 @@
+bugfixes:
+  - become - Report the initial ``setfacl`` failure when no fallback can grant an unprivileged become user access to temporary files (https://github.com/ansible/ansible/issues/85503).
