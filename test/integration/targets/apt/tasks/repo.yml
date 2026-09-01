@@ -310,6 +310,51 @@
       that:
         - "autoremove_result is not changed"
 
+  - name: Reinstall foobar with its automatically installed dependency
+    apt:
+      name: foobar=1.0.0
+      allow_downgrade: yes
+      allow_unauthenticated: yes
+
+  - name: Upgrade foobar again to make foo eligible for autoremove
+    apt:
+      upgrade: dist
+      force: yes  # workaround for --allow-unauthenticated used along with upgrade
+
+  - name: Autoremove should run with cache update options
+    apt:
+      autoremove: yes
+      update_cache: yes
+      cache_valid_time: 3600
+    register: autoremove_with_cache_result
+
+  - name: Check that autoremove with cache options reports changed=True
+    assert:
+      that:
+        - "autoremove_with_cache_result is changed"
+
+  - name: Check foo with dpkg after autoremove with cache options
+    shell: dpkg-query -l foo
+    register: dpkg_result
+    ignore_errors: yes
+
+  - name: Check that foo was removed by autoremove with cache options
+    assert:
+      that:
+        - "dpkg_result is failed"
+
+  - name: Nothing to autoremove with cache options
+    apt:
+      autoremove: yes
+      update_cache: yes
+      cache_valid_time: 3600
+    register: autoremove_with_cache_result
+
+  - name: Check that autoremove with cache options reports changed=False
+    assert:
+      that:
+        - "autoremove_with_cache_result is not changed"
+
   - name: Create a fake .deb file for autoclean to remove
     file:
       name: /var/cache/apt/archives/python3-q_2.4-1_all.deb

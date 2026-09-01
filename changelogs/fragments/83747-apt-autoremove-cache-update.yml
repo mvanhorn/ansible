@@ -1,0 +1,3 @@
+bugfixes:
+  - apt - run requested ``autoremove`` or ``autoclean`` operations when cache update
+    options are also specified (https://github.com/ansible/ansible/issues/83747).
