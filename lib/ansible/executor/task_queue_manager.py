@@ -239,7 +239,13 @@ class TaskQueueManager:
         signal.signal(signum, signal.SIG_DFL)
 
         for worker in self._workers:
-            if worker is None or not worker.is_alive():
+            if worker is None:
+                continue
+            try:
+                if not worker.is_alive():
+                    continue
+            except AssertionError:
+                # The handler may run in a forked child before it replaces inherited handlers.
                 continue
             if worker.pid:
                 try:

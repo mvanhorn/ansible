@@ -1,0 +1,4 @@
+bugfixes:
+  - >-
+    Task queue manager - avoid a parent-owned ``Process.is_alive()`` assertion traceback when a forked worker receives an early signal
+    (https://github.com/ansible/ansible/issues/86946).
