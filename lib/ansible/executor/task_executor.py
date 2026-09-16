@@ -357,7 +357,12 @@ class TaskExecutor:
         """
         task_ctx = TaskContext.current()
 
-        self._calculate_delegate_to()
+        try:
+            self._calculate_delegate_to()
+        except AnsibleUndefinedVariable:
+            # Allow a pending loop error to reach conditional evaluation.
+            if self._loop_eval_error is None:
+                raise
 
         context_validation_error = None
 

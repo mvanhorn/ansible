@@ -1,0 +1,194 @@
+- name: honor guarded undefined loops with item-based delegation
+  hosts: localhost
+  gather_facts: false
+  connection: local
+  tasks:
+    - name: skip undefined loop with item-based delegation and is defined guard
+      fail:
+        msg: this task should never execute
+      loop: "{{ undefined_loop_hosts }}"
+      delegate_to: "{{ item }}"
+      when: undefined_loop_hosts is defined
+      register: skipped_delegated
+
+    - name: skip undefined loop without delegation and is defined guard
+      fail:
+        msg: this task should never execute
+      loop: "{{ undefined_loop_hosts }}"
+      when: undefined_loop_hosts is defined
+      register: skipped_non_delegated
+
+    - name: skip undefined loop with item-based delegation and literal false condition
+      fail:
+        msg: this task should never execute
+      loop: "{{ undefined_loop_hosts }}"
+      delegate_to: "{{ item }}"
+      when: false
+      register: skipped_literal_false
+
+    - name: skip undefined loop with custom loop_var delegation and is defined guard
+      fail:
+        msg: this task should never execute
+      loop: "{{ undefined_loop_hosts }}"
+      loop_control:
+        loop_var: delegated_host
+      delegate_to: "{{ delegated_host }}"
+      when: undefined_loop_hosts is defined
+      register: skipped_custom_loop_var
+
+    - name: skip undefined with_items with item-based delegation and is defined guard
+      fail:
+        msg: this task should never execute
+      with_items: "{{ undefined_loop_hosts }}"
+      delegate_to: "{{ item }}"
+      when: undefined_loop_hosts is defined
+      register: skipped_with_items
+
+    - name: assert guarded undefined loops skip consistently
+      assert:
+        that:
+          - skipped_delegated is skipped
+          - skipped_delegated is not failed
+          - skipped_delegated is not changed
+          - skipped_delegated.results is undefined
+          - skipped_delegated.skip_reason is contains 'Conditional result was False'
+          - skipped_delegated.false_condition == 'undefined_loop_hosts is defined'
+          - skipped_non_delegated is skipped
+          - skipped_non_delegated is not failed
+          - skipped_non_delegated is not changed
+          - skipped_non_delegated.results is undefined
+          - skipped_non_delegated.skip_reason == skipped_delegated.skip_reason
+          - skipped_non_delegated.false_condition == skipped_delegated.false_condition
+          - skipped_literal_false is skipped
+          - skipped_literal_false is not failed
+          - skipped_literal_false is not changed
+          - skipped_literal_false.skip_reason is contains 'Conditional result was False'
+          - skipped_literal_false.false_condition == False
+          - skipped_custom_loop_var is skipped
+          - skipped_custom_loop_var is not failed
+          - skipped_custom_loop_var is not changed
+          - skipped_custom_loop_var.false_condition == 'undefined_loop_hosts is defined'
+          - skipped_with_items is skipped
+          - skipped_with_items is not failed
+          - skipped_with_items is not changed
+          - skipped_with_items.false_condition == 'undefined_loop_hosts is defined'
+
+    - name: fail undefined loop with item-based delegation and true condition
+      fail:
+        msg: this task should never execute
+      loop: "{{ undefined_loop_hosts }}"
+      delegate_to: "{{ item }}"
+      when: true
+      ignore_errors: true
+      register: failed_true_condition
+
+    - name: fail undefined loop with item-based delegation and no condition
+      fail:
+        msg: this task should never execute
+      loop: "{{ undefined_loop_hosts }}"
+      delegate_to: "{{ item }}"
+      ignore_errors: true
+      register: failed_no_condition
+
+    - name: fail undefined loop with item-based delegation and invalid condition
+      fail:
+        msg: this task should never execute
+      loop: "{{ undefined_loop_hosts }}"
+      delegate_to: "{{ item }}"
+      when: 1 / 0
+      ignore_errors: true
+      register: failed_invalid_condition
+
+    - name: assert pending loop errors identify the undefined loop input
+      assert:
+        that:
+          - failed_true_condition is failed
+          - failed_true_condition is not skipped
+          - failed_true_condition.msg is contains 'undefined_loop_hosts'
+          - failed_true_condition.msg is not contains "'item' is undefined"
+          - failed_true_condition.msg is not contains 'this task should never execute'
+          - failed_no_condition is failed
+          - failed_no_condition is not skipped
+          - failed_no_condition.msg is contains 'undefined_loop_hosts'
+          - failed_no_condition.msg is not contains "'item' is undefined"
+          - failed_no_condition.msg is not contains 'this task should never execute'
+          - failed_invalid_condition is failed
+          - failed_invalid_condition is not skipped
+          - failed_invalid_condition.msg is contains 'undefined_loop_hosts'
+          - failed_invalid_condition.msg is not contains "'item' is undefined"
+          - failed_invalid_condition.msg is not contains 'this task should never execute'
+
+    - name: defined loop with item-based localhost delegation
+      ping:
+      loop:
+        - localhost
+        - localhost
+      delegate_to: "{{ item }}"
+      register: defined_loop_ok
+
+    - name: defined loop skips only false-condition iterations
+      ping:
+      loop:
+        - localhost
+        - skip_host
+      delegate_to: "{{ item }}"
+      when: item == 'localhost'
+      register: defined_loop_partial
+
+    - name: empty loop with item-based delegation still skips
+      fail:
+        msg: this task should never execute
+      loop: []
+      delegate_to: "{{ item }}"
+      register: empty_loop
+
+    - name: assert defined and empty delegated loops behave normally
+      assert:
+        that:
+          - defined_loop_ok is success
+          - defined_loop_ok.results | length == 2
+          - defined_loop_ok.results[0] is success
+          - defined_loop_ok.results[0] is not skipped
+          - defined_loop_ok.results[0].ping == 'pong'
+          - defined_loop_ok.results[1] is success
+          - defined_loop_ok.results[1] is not skipped
+          - defined_loop_ok.results[1].ping == 'pong'
+          - defined_loop_partial is success
+          - defined_loop_partial.results | length == 2
+          - defined_loop_partial.results[0] is success
+          - defined_loop_partial.results[0] is not skipped
+          - defined_loop_partial.results[0].ping == 'pong'
+          - defined_loop_partial.results[1] is skipped
+          - defined_loop_partial.results[1] is not failed
+          - defined_loop_partial.results[1].skip_reason is contains 'Conditional result was False'
+          - empty_loop is skipped
+          - empty_loop is not failed
+          - empty_loop is not changed
+          - empty_loop.skip_reason is contains 'No items in the list'
+
+    - name: undefined delegate_to without a loop still fails under a false condition
+      ping:
+      delegate_to: "{{ undefined_delegate_host }}"
+      when: false
+      ignore_errors: true
+      register: undefined_delegate_no_loop
+
+    - name: undefined delegate_to with a valid loop still fails under a false condition
+      ping:
+      loop:
+        - localhost
+      delegate_to: "{{ undefined_delegate_host }}"
+      when: false
+      ignore_errors: true
+      register: undefined_delegate_valid_loop
+
+    - name: assert undefined delegation still fails without a pending loop error
+      assert:
+        that:
+          - undefined_delegate_no_loop is failed
+          - undefined_delegate_no_loop is not skipped
+          - undefined_delegate_no_loop.msg is contains 'undefined_delegate_host'
+          - undefined_delegate_valid_loop is failed
+          - undefined_delegate_valid_loop is not skipped
+          - undefined_delegate_valid_loop.results[0] is failed
+          - undefined_delegate_valid_loop.results[0].msg is contains 'undefined_delegate_host'

@@ -1,0 +1,2 @@
+bugfixes:
+  - delegate_to - honor a false ``when`` condition for an undefined loop when ``delegate_to`` is based on the loop item (https://github.com/ansible/ansible/issues/85849).
